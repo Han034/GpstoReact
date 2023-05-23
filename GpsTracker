@@ -1,0 +1,66 @@
+import React, { useEffect } from 'react';
+import { PermissionsAndroid, Platform } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
+import BackgroundTask from 'react-native-background-task';
+import axios from 'axios';
+
+BackgroundTask.define(async () => {
+  await sendLocationToAPI();
+  BackgroundTask.finish();
+});
+
+const sendLocationToAPI = async () => {
+  // Konum bilgisi al
+  Geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords;
+
+      // API'ye gönder
+      try {
+        await axios.post('https://example.com/api/location', { latitude, longitude });
+      } catch (error) {
+        console.error('API isteği başarısız:', error);
+      }
+    },
+    (error) => console.error('Konum bilgisi alınamadı:', error),
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+  );
+};
+
+const requestLocationPermission = async () => {
+  if (Platform.OS === 'android') {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Konum İzni',
+          message: 'GPS konum bilgisine erişmek için izin vermeniz gerekiyor.',
+          buttonNeutral: 'Daha sonra sor',
+          buttonNegative: 'İptal',
+          buttonPositive: 'Tamam',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (error) {
+      console.error('Konum izni alınamadı:', error);
+      return false;
+    }
+  }
+  return true;
+};
+
+const App = () => {
+  useEffect(() => {
+    requestLocationPermission().then((granted) => {
+      if (granted) {
+        BackgroundTask.schedule({
+          period: 1800, // saniye cinsinden gönderim aralığı
+        });
+      }
+    });
+  }, []);
+
+  return null;
+};
+
+export default App;
